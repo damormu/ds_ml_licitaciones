@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import unicodedata
 
 def data_report(df):
     # Sacamos los NOMBRES
@@ -22,11 +24,21 @@ def data_report(df):
 
     return concatenado
 
-def tratar_strings(df):
+def quitar_acentos(texto):
+    return ''.join(
+        c for c in unicodedata.normalize('NFKD', texto)
+        if not unicodedata.combining(c)
+    )
 
+def tratar_strings(df):
+    
+    df.columns = [quitar_acentos(col) for col in df.columns]
     df.columns = df.columns.str.replace(r"['’`´]", "", regex=True)
+    df.columns = df.columns.str.replace(r" ", "_", regex=True)
+
     for col in df.select_dtypes(include=['object']).columns:
         df[col] = df[col].astype(str).str.replace(r"['’`´]", "", regex=True).str.lower()
+        df[col] = df[col].apply(quitar_acentos)
     
     return df
 
@@ -37,9 +49,7 @@ def similitud_con_target(df, y, cols, pipeline_steps):
         print(f"Porcentage coincidencia {col} / {y.name}: {porcentaje:.2f}%")
 
         if porcentaje > 95:
-            print(f"Se elimina columna: {col}")
-            df.drop(columns=[col], inplace=True)
-            pipeline_steps.append(lambda df, col=col: df.drop(col, axis=1))
+            print(f"Se debería eliminar la columna: {col}")
     
 
 def eliminar_columnas_nulas(df, pipeline_steps, threshold=0.6):
@@ -107,8 +117,9 @@ def tratar_columnas_con_algun_blanco(df, pipeline_steps, val='Otros'):
                     pipeline_steps.append(lambda df, col=col: df.drop(col, axis=1))
                 else:
                     print(f"Columna con blancos: {col} {nulos} {porcentaje:.2f}%")
-                    otros(df, col, val)
-                    pipeline_steps.append(lambda df, col=col: otros(df, col, val))
+                    if porcentaje < 30:
+                        otros(df, col, val)
+                        pipeline_steps.append(lambda df, col=col: otros(df, col, val))
 
 def tratar_columnas_con_algun_cero(df, pipeline_steps):
 
@@ -132,19 +143,6 @@ def tratar_columnas_con_algun_cero(df, pipeline_steps):
                     print(f"Columna con ceros: {col} {ceros} {porcentaje:.2f}%")
 
 
-def tratar_codi_cpv(df):
-
-    col = 'Codi CPV'
-
-    col_div = col + '_div'
-    df[col_div] = df[col].apply(lambda x: x[:2] if isinstance(x, str) and x.strip() != '' else '0').astype('int')
-
-    col_grp = col + '_grp'
-    df[col_grp] = df[col].apply(lambda x: x[:-2] if isinstance(x, str) and x.strip() != '' else '0').astype('int')
-
-    df.drop(columns=[col], inplace=True)
-                    
-    return df
 
 def fechas(df):
 
@@ -183,8 +181,11 @@ def fechas(df):
                 print('error')
 
         df[col] = df["datetime_" + col]
-        df.drop(columns=["datetime_" + col], inplace=True)
+        
+        columnas_dt(df, col)
 
+        df.drop(columns=[col, "datetime_" + col], inplace=True)
+        
     return df
 
 def columnas_dt(df, col):
@@ -193,25 +194,15 @@ def columnas_dt(df, col):
     df["day_" + col] = df[col].dt.day
     df["month_" + col] = df[col].dt.month
     df["year_" + col] = df[col].dt.year
+    df["unix_" + col] = df[col].astype("int64") // 10**9
 
     return df
 
-def duracion(df, col_ini, col_fin):
+def duracion(df):
     
-    if col_ini in df.columns:
-        columnas_dt(df, col_ini)
+    df["Duracion_total"] = (df["Durada_dies"] + df["Durada_mesos"] * 30 + df["Durada_anys"] * 365) 
 
-    if col_fin in df.columns:
-        columnas_dt(df, col_fin)      
-    
-    if (col_fin in df.columns and col_ini in df.columns):
-
-        # Calcular la diferencia de días siempre positiva
-        df['durada_dies'] = (
-            df.apply(lambda row: (row[col_fin] - row[col_ini]).days if row[col_fin] >= row[col_ini] else (row[col_ini] - row[col_fin]).days, axis=1)
-        )
-
-    df.drop(columns=[col_ini, col_fin], inplace=True)
+    df.drop(columns=['Durada_dies', 'Durada_mesos', 'Durada_anys'], inplace=True)
 
     return df
 
@@ -242,9 +233,93 @@ def mediana(df, col):
 
 
     
+def identificador_agrupacio_organisme(df):
         
+    df["Indice_Identificador_agrupacio_organisme"] = df["Identificador_agrupacio_organisme"].str[:2]
+    df["Indice_Identificador_agrupacio_organisme"].value_counts()
 
-                   
+    clave_referencia_licitacio = {
+        "08": "Barcelona",
+        "80": "Barcelona",
+        "96": "Departamentos_Estudio",
+        "15": "Salud",
+        "43": "Tarragona",
+        "17": "Girona",
+        "14": "Cultura",
+        "25": "Lleida",
+        "00": "Sociales",
+        "81": "Consejo_Comarcal",
+        "79": "Fundacion_privada",
+        "98": "Desarrollo",
+        "99": "Varios",
+        "70": "Varios",
+        "10": "Varios",
+        "90": "Varios",
+        "82": "Varios",
+        "95": "Varios"
 
+    }
+
+    df["Referencia_Licitacio"] = df["Indice_Identificador_agrupacio_organisme"].map(clave_referencia_licitacio)
+    df["Referencia_Licitacio"] = np.where(
+        df["Identificador_agrupacio_organisme"] =="8000",
+        "Universidades",
+        df["Referencia_Licitacio"]
+    )
+
+    '''
+    Y ahora hacemos la transformación pertinente, para convertir la feature en numerica 
+    '''
+
+    clave_referencia_licitacio_numerico = {
+        "Barcelona": 1,
+        "Departamentos_Estudio": 2,
+        "Salud": 3,
+        "Tarragona": 4,
+        "Universidades": 5,
+        "Girona": 6,
+        "Cultura": 7,
+        "Lleida": 8,
+        "Sociales": 9,
+        "Consejo_Comarcal": 10,
+        "Fundacion_privada": 11,
+        "Desarrollo": 12,
+        "Varios": 13,  
+    }
+    df["Referencia_Licitacio"] = df["Referencia_Licitacio"].map(clave_referencia_licitacio_numerico)
+
+    '''
+    Una vez resuelto esto, toca eliminar la columna del identificador, dada su alta cardinalidad
+    '''
+    df.drop("Identificador_agrupacio_organisme", axis = 1, inplace = True)
+    df.drop("Indice_Identificador_agrupacio_organisme", axis = 1, inplace = True)
+
+    return df
+                    
+def tipus_de_contracte(df):
+
+    clave_tipus_contracte = {
+    '5. serveis': 1,
+    '3. subministraments': 2,
+    '1. obres': 3,
+    '10. privat dadministracio publica': 4,
+    'subministraments': 2,
+    'gestio de servei public': 5,
+    '8. concessio de serveis': 6   
+    }
+
+    df["Tipus_de_contracte"] = df["Tipus_de_contracte"].map(clave_tipus_contracte)
+
+    return df
+
+def codi_cpv(df, df_cpv):
+
+    # los 2 primeros dígitos son la división
+    df["Codi_CPV_div"] = df["Codi_CPV"].str[:2].str.zfill(2)
+    df["Codi_CPV"] = df["Codi_CPV"].str[:8].astype(str).str.zfill(8)
+    
+    df = df.merge(df_cpv[['CPV_def','CPV_Descripcion', 'Tipo_de_contrato']], left_on='Codi_CPV', right_on='CPV_def', how='left')
+    
+    return df
 
 
