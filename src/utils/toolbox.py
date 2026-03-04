@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import unicodedata
 
+from sklearn.metrics import mean_squared_error
+
 def data_report(df):
     # Sacamos los NOMBRES
     cols = pd.DataFrame(df.columns.values, columns=["COL_N"])
@@ -321,5 +323,16 @@ def codi_cpv(df, df_cpv):
     df = df.merge(df_cpv[['CPV_def','CPV_Descripcion', 'Tipo_de_contrato']], left_on='Codi_CPV', right_on='CPV_def', how='left')
     
     return df
+
+def predecir(model, X_test, y_test):
+    # Predecir sobre el test
+    y_pred = model.predict(X_test)
+    y_pred = np.expm1(y_pred)
+    y_test = np.expm1(y_test)
+
+    # Calcular RMSE en escala logarítmica
+    rmse_log = np.sqrt(mean_squared_error(y_test, y_pred))
+    print(f"RMSE modelo {model}: {rmse_log:.4f}")
+
 
 
