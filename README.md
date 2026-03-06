@@ -63,6 +63,7 @@ La solución propuesta sigue una estructura detallada:
 
 La estructura principal del repositorio es la siguiente:
 
+```
 main.ipynb
 src/
  ├── data_sample/
@@ -86,7 +87,7 @@ src/
  └── utils/
      ├── bootcampviztools.py
      └── toolbox.py
-
+```
 ---
 
 ## Tecnologías utilizadas
@@ -227,6 +228,7 @@ Summary of findings, limitations and improvement strategy.
 
 The main structure of the repository is the following:
 
+```
 main.ipynb
 src/
  ├── data_sample/
@@ -250,7 +252,7 @@ src/
  └── utils/
      ├── bootcampviztools.py
      └── toolbox.py
-
+```
 ---
 
 ## Technologies Used
