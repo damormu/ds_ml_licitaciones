@@ -5,6 +5,12 @@ import unicodedata
 from sklearn.metrics import mean_squared_error
 
 def data_report(df):
+
+    '''
+    Esta función nos devuelve un dataframe con un resumen de cada columna 
+    del dataframe original, incluyendo su nombre, tipo de dato, porcentaje de valores 
+    faltantes, número de valores únicos y porcentaje de cardinalidad.
+    '''
     # Sacamos los NOMBRES
     cols = pd.DataFrame(df.columns.values, columns=["COL_N"])
 
@@ -27,12 +33,20 @@ def data_report(df):
     return concatenado
 
 def quitar_acentos(texto):
+
+    '''Esta función recibe un texto y devuelve el mismo texto sin acentos 
+    ni caracteres especiales.'''
+    
     return ''.join(
         c for c in unicodedata.normalize('NFKD', texto)
         if not unicodedata.combining(c)
     )
 
 def tratar_strings(df):
+    
+    '''Esta función recibe un dataframe y devuelve el mismo dataframe con los nombres 
+    de las columnas y los valores de tipo string tratados, eliminando acentos, 
+    caracteres especiales y espacios.'''
     
     df.columns = [quitar_acentos(col) for col in df.columns]
     df.columns = df.columns.str.replace(r"['’`´]", "", regex=True)
@@ -46,6 +60,11 @@ def tratar_strings(df):
 
 def similitud_con_target(df, y, cols, pipeline_steps):
     
+    '''Esta función recibe un dataframe, una variable target, una lista de columnas 
+    y una lista de pasos del pipeline.
+    Para cada columna de la lista, calcula el porcentaje de coincidencia 
+    entre los valores de la columna y la variable target.'''
+
     for col in cols:
         porcentaje = len(df[df[col] == y])*100/len(df)
         print(f"Porcentage coincidencia {col} / {y.name}: {porcentaje:.2f}%")
@@ -55,6 +74,10 @@ def similitud_con_target(df, y, cols, pipeline_steps):
     
 
 def eliminar_columnas_nulas(df, pipeline_steps, threshold=0.6):
+
+    '''Esta función recibe un dataframe, una lista de pasos del pipeline y un umbral.
+    Elimina las columnas que están completamente vacías o que tienen todos los valores
+    como strings vacíos.'''
 
     # Encontrar columnas totalmente nulas o con todos los strings vacíos
     columnas_nulas = [col for col in df.columns 
@@ -72,6 +95,9 @@ def eliminar_columnas_nulas(df, pipeline_steps, threshold=0.6):
 
 def tratar_cardinalidad(df, pipeline_steps, threshold=0.6):
     
+    '''Esta función recibe un dataframe, una lista de pasos del pipeline y un umbral.
+    Elimina las columnas que tienen una cardinalidad del 0% o mayor que el umbral.'''
+
     l = len(df)
 
     # Encontrar columnas con cardinalidad 0 o mayor que el umbral
@@ -95,11 +121,18 @@ def tratar_cardinalidad(df, pipeline_steps, threshold=0.6):
 
 def otros(df, col, val='Otros'):
 
+    '''Esta función recibe un dataframe, una columna y un valor. 
+    Reemplaza los valores vacíos de la columna por el valor especificado.'''
+
     df[col] = df[col].apply(lambda x: val if str(x) == '' else x)
 
     return df
 
 def tratar_columnas_con_algun_blanco(df, pipeline_steps, val='Otros'):
+
+    '''Esta función recibe un dataframe, una lista de pasos del pipeline y un valor.
+    Elimina las columnas que tienen más del 70% de valores en blanco o reemplaza 
+    los valores en blanco por el valor especificado.'''
 
     l = len(df)
     columnas_objeto = df.select_dtypes(include=['object']).columns.tolist()
@@ -125,6 +158,9 @@ def tratar_columnas_con_algun_blanco(df, pipeline_steps, val='Otros'):
 
 def tratar_columnas_con_algun_cero(df, pipeline_steps):
 
+    '''Esta función recibe un dataframe, una lista de pasos del pipeline y un valor.
+    Elimina las columnas que tienen más del 70% de valores en cero '''
+
     l = len(df)
     columnas_numericas = df.select_dtypes(include=['number']).columns.tolist()
 
@@ -143,10 +179,14 @@ def tratar_columnas_con_algun_cero(df, pipeline_steps):
                     pipeline_steps.append(lambda df, col=col: df.drop(col, axis=1))
                 else:
                     print(f"Columna con ceros: {col} {ceros} {porcentaje:.2f}%")
-
+                    
 
 
 def fechas(df):
+
+    '''Esta función recibe un dataframe y devuelve el mismo dataframe con las columnas 
+    de fecha tratadas, convirtiendo las fechas a formato datetime, añadiendo columnas de día, 
+    mes y año y eliminando las columnas originales.'''
 
     columnas_fecha = [col for col in df.columns if col.startswith('Data')]
 
@@ -191,6 +231,10 @@ def fechas(df):
     return df
 
 def columnas_dt(df, col):
+
+    '''Esta función recibe un dataframe y una columna de tipo datetime, 
+    y devuelve el mismo dataframe con las columnas de día, 
+    mes, año y unix timestamp añadidas.'''
     
     # Añadimos las columnas dia, mes y año de las fechas y eliminamos la columna fecha
     df["day_" + col] = df[col].dt.day
@@ -201,6 +245,10 @@ def columnas_dt(df, col):
     return df
 
 def duracion(df):
+
+    '''Esta función recibe un dataframe y devuelve el mismo dataframe con la columna 
+    de duración total calculada a partir de las columnas de días, meses y años, 
+    eliminando las columnas originales.'''
     
     df["Duracion_total"] = (df["Durada_dies"] + df["Durada_mesos"] * 30 + df["Durada_anys"] * 365) 
 
@@ -210,6 +258,9 @@ def duracion(df):
 
 
 def similitud_con_exercici(df, pipeline_steps):
+
+    '''Esta función recibe un dataframe y una lista de pasos del pipeline.
+    Elimina las columnas que tienen una similitud del 100% con la columna de ejercicio'''
 
     col = 'Exercici'
     l = len(df)
@@ -227,6 +278,10 @@ def similitud_con_exercici(df, pipeline_steps):
 
 def mediana(df, col):
     
+    '''Esta función recibe un dataframe y una columna, 
+    y devuelve el mismo dataframe con los valores negativos o cero reemplazados 
+    por la mediana de la columna.'''
+
     if col in df.columns:
         mediana = df[col].median()
         df.loc[df[col] <= 0, col] = mediana
@@ -236,6 +291,10 @@ def mediana(df, col):
 
     
 def identificador_agrupacio_organisme(df):
+
+    '''Esta función recibe un dataframe y devuelve el mismo dataframe con la columna
+    de Identificador_agrupacio_organisme tratada, creando una nueva columna de referencia
+    a partir de los 2 primeros dígitos del identificador, y eliminando la columna original.'''
         
     df["Indice_Identificador_agrupacio_organisme"] = df["Identificador_agrupacio_organisme"].str[:2]
     df["Indice_Identificador_agrupacio_organisme"].value_counts()
@@ -300,6 +359,10 @@ def identificador_agrupacio_organisme(df):
                     
 def tipus_de_contracte(df):
 
+    ''''Esta función recibe un dataframe y devuelve el mismo dataframe con la columna
+    de Tipus_de_contracte tratada, creando una nueva columna de referencia a partir de los tipos de contrato,
+    y eliminando la columna original.'''
+
     clave_tipus_contracte = {
     '5. serveis': 1,
     '3. subministraments': 2,
@@ -316,6 +379,10 @@ def tipus_de_contracte(df):
 
 def codi_cpv(df, df_cpv):
 
+    '''Esta función recibe un dataframe y otro dataframe con la información de los códigos CPV,
+    y devuelve el mismo dataframe con la columna de Codi_CPV tratada, 
+    creando nuevas columnas de referencia a partir de los códigos CPV, y eliminando la columna original.
+    '''
     # los 2 primeros dígitos son la división
     df["Codi_CPV_div"] = df["Codi_CPV"].str[:2].str.zfill(2)
     df["Codi_CPV"] = df["Codi_CPV"].str[:8].astype(str).str.zfill(8)
@@ -325,6 +392,10 @@ def codi_cpv(df, df_cpv):
     return df
 
 def predecir(model, X_test, y_test):
+
+    '''Esta función recibe un modelo, un conjunto de datos de prueba y una variable target de prueba,
+    y devuelve el RMSE del modelo en escala logarítmica.'''
+    
     # Predecir sobre el test
     y_pred = model.predict(X_test)
     y_pred = np.expm1(y_pred)
